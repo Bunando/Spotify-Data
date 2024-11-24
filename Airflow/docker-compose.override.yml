@@ -1,0 +1,5 @@
+version: "3.4"
+services:
+  scheduler:
+    volumes:
+      - ./data:/usr/local/airflow/data:rw
