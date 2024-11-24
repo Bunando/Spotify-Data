@@ -69,7 +69,10 @@ def main():
             else:
                 top(songs, prevSongs)
         elif type_args.type == 'a':
-            top(artists, prevArtists)
+            if type_args.n != False:
+                top(artists, prevArtists, type_args.n)
+            else:
+                top(artists, prevArtists)
         elif type_args.type == 'sh':
             topHistory(input('Artist: ') + ": " + input('Song: '), True, timedelta(weeks=type_args.w), basedOnRank=not type_args.n)
         elif type_args.type == 'ah':
@@ -77,9 +80,10 @@ def main():
         elif type_args.type == 'n':
             topNewSongs()
         elif type_args.type == 'f':
-            findSong(input('Song: '))
-        elif type_args.type == 'fa':
-            findArtist(input('Artist: '))
+            if type_args.a == True:
+                findArtist(input('Artist: '))
+            else:
+                findSong(input('Song: '))
         elif type_args.type == 'g':
             analyzeSongStats()
 
@@ -129,12 +133,15 @@ def setStats(stats: dict) -> None:
 def getTypeArgs() -> argparse.Namespace:
     type_parser = argparse.ArgumentParser()
     type_parser.add_argument("type", type=str, help="the type of anaylsis to perform")
+    type_parser.add_argument("-a", action='store_true', help="artist")
     type_parser.add_argument("-n", nargs="?", type=int, const=True, default=False, help="display number of streams")
     type_parser.add_argument("-w", default=24, type=int, help="total number of weeks to calculate")
     
     addStatsArgs(type_parser)
 
     type_args = type_parser.parse_args(input("Type of Analysis: ").split())
+    if type_args.type == "h":
+        type_parser.print_help()
     return type_args
 
 def addStatsArgs(parser: argparse.ArgumentParser):
