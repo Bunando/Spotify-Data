@@ -1,4 +1,4 @@
-airflow
+apache-airflow
 spotipy
 numpy
 pandas
