@@ -8,11 +8,8 @@ from spotipy.oauth2 import SpotifyOAuth
 scope = "user-read-recently-played"
 
 def collectData():
-    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id="49e5d067614c4d3e8e2dd2335cbaf4e0",
-                                            client_secret="6546b49cbce74e3fb690829c45b86c1b",
-                                            redirect_uri="http://localhost:1234",
+    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(redirect_uri="http://localhost:1234",
                                             scope=scope))
-    # sp = spotipy.Spotify(auth="BQBRKzH9tcWb-5m3wcsZ68sYrhqktpspVr_2tjSDGvpMKNjb49HcT9HBcxUsJncXBuVi5VrpFSjkPgSnmiTBeLStThNtcD7TvP5MXR0VWO_eqlDcoS1ewo7gF_PDTTLVAsbSrLsQpwjFea8jrufcP6W5ea1F71SGv_aoFOI801xNOampwN7CJj0f93nSkkxnAZTxjdukYlyUn2CU4RI")
     
     results = sp.current_user_recently_played(limit=50)
 

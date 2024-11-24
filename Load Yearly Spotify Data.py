@@ -28,8 +28,7 @@ except FileNotFoundError:
 with open('StreamingHistory_music_3.json', 'r', encoding='utf-8') as file:
     newData = json.load(file)
 
-auth_manager = SpotifyClientCredentials(client_id="a3bb7b8990ed44dbab8a7f08f2eb35c9",
-                                        client_secret="efac395ce58349cda7c97e13d4b380ff")
+auth_manager = SpotifyClientCredentials()
 sp = spotipy.Spotify(auth_manager=auth_manager, retries=0)
 
 for i, play in enumerate(newData):
