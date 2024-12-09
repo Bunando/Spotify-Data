@@ -63,10 +63,10 @@ def main():
         elif type_args.type == 'sh':
             song = input('Song: ')
             artist = input('Artist: ')
-            topHistory(artist + ": " + song, True, timedelta(weeks=type_args.w), basedOnRank=not type_args.n)
+            topHistory(artist + ": " + song, True, type_args.r, timedelta(weeks=type_args.w), basedOnRank=not type_args.n)
 
         elif type_args.type == 'ah':
-            topHistory(input('Artist: '), False, timedelta(weeks=type_args.w), basedOnRank=not type_args.n)
+            topHistory(input('Artist: '), False, type_args.r, timedelta(weeks=type_args.w), basedOnRank=not type_args.n)
 
         elif type_args.type == 'n':
             topNewSongs()
@@ -400,7 +400,7 @@ def showPlot(x: int, y: int, name: str, numPlaces: int, rank=True):
     fig,ax = plt.subplots()
     line, = plt.plot(x,y)
     if rank:
-        plt.ylim(50, 1)
+        plt.ylim(numPlaces, 1)
     plt.title(name)
 
     # Show annotations
