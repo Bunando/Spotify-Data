@@ -13,15 +13,6 @@ matplotlib.use('Qt5Agg')
 
 data = list()
 
-with open('AllData.json', 'r', encoding='utf-8') as file:
-    data = json.load(file)
-
-with open('PastYearData.json', 'r', encoding='utf-8') as file:
-    data.extend(json.load(file))
-
-with open('Airflow/data/SelfCollectedData.json', 'r', encoding='utf-8') as file:
-    data.extend(json.load(file))
-
 ms: int
 
 load_dotenv()
@@ -50,7 +41,7 @@ def main():
         if type_args.type == 'r':
             init(type_args)
 
-        elif (type_args.eo != None or type_args.ed != None) or (type_args.ld != None or type_args.lw != None or type_args.lm != 1):
+        elif (type_args.eo != None or type_args.ed != None) or (type_args.ld != None or type_args.lw != None or type_args.lm != 1) or type_args.wrapped != None:
             tempCalc = True
 
         # Temporarily set stats to new values
@@ -64,26 +55,28 @@ def main():
             init(type_args)
         
         if type_args.type == 't':
-            if type_args.n != False:
-                top(songs, prevSongs, type_args.n)
-            else:
-                top(songs, prevSongs)
+            top(songs, prevSongs, type_args.n, type_args.r)
+
         elif type_args.type == 'a':
-            if type_args.n != False:
-                top(artists, prevArtists, type_args.n)
-            else:
-                top(artists, prevArtists)
+            top(artists, prevArtists, type_args.n, type_args.r)
+
         elif type_args.type == 'sh':
-            topHistory(input('Artist: ') + ": " + input('Song: '), True, timedelta(weeks=type_args.w), basedOnRank=not type_args.n)
+            song = input('Song: ')
+            artist = input('Artist: ')
+            topHistory(artist + ": " + song, True, timedelta(weeks=type_args.w), basedOnRank=not type_args.n)
+
         elif type_args.type == 'ah':
             topHistory(input('Artist: '), False, timedelta(weeks=type_args.w), basedOnRank=not type_args.n)
+
         elif type_args.type == 'n':
             topNewSongs()
+
         elif type_args.type == 'f':
             if type_args.a == True:
                 findArtist(input('Artist: '))
             else:
                 findSong(input('Song: '))
+
         elif type_args.type == 'g':
             analyzeSongStats()
 
@@ -93,6 +86,25 @@ def main():
 
 def init(args: argparse.Namespace) -> None:
     global ms; ms = 0
+
+    loadData()
+
+    if args.wrapped != None:
+        endDate = "11-26"
+        currStats = getStats(datetime.fromisoformat(str(args.wrapped)+"-"+endDate), datetime.fromisoformat(str(args.wrapped)+"-"+endDate)-datetime.fromisoformat(str(args.wrapped)+"-01-01"), includeFeatures=False)
+        print(f"Minutes: {(ms/60000):.2f}")
+        prevStats = [list(), list()]
+        if not args.p:
+            prevStats = getStats(datetime.fromisoformat(str(args.wrapped-1)+"-"+endDate), datetime.fromisoformat(str(args.wrapped-1)+"-"+endDate)-datetime.fromisoformat(str(args.wrapped-1)+"-01-01"), includeFeatures=False)
+        stats = {
+            "songs" : currStats[0],
+            "artists" : currStats[1],
+            "prevSongs" : prevStats[0],
+            "prevArtists": prevStats[1],
+        }
+        setStats(stats)
+        args.n = True
+        return
 
     if args.eo != None:
         endTime = getStartOfWeek(datetime.now(tz=timezone.utc) - timedelta(weeks=args.eo))
@@ -110,7 +122,10 @@ def init(args: argparse.Namespace) -> None:
     
     currStats = getStats(endTime, timeLength)
     print(f"Minutes: {(ms/60000):.2f}")
-    prevStats = getStats(getStartOfWeek(endTime-timedelta(hours=2)), timeLength)
+    if args.p or timeLength > timedelta(days=365):
+        prevStats = [list(), list()] # Don't calculate previous stats
+    else:
+        prevStats = getStats(getStartOfWeek(endTime-timedelta(hours=2)), timeLength)
     stats = {
         "songs" : currStats[0],
         "artists" : currStats[1],
@@ -118,6 +133,18 @@ def init(args: argparse.Namespace) -> None:
         "prevArtists": prevStats[1],
     }
     setStats(stats)
+
+def loadData():
+    global data
+
+    with open('AllData.json', 'r', encoding='utf-8') as file:
+        data = json.load(file)
+
+    with open('PastYearData.json', 'r', encoding='utf-8') as file:
+        data.extend(json.load(file))
+
+    with open('Airflow/data/SelfCollectedData.json', 'r', encoding='utf-8') as file:
+        data.extend(json.load(file))
 
 def setStats(stats: dict) -> None:
     global songs
@@ -135,6 +162,7 @@ def getTypeArgs() -> argparse.Namespace:
     type_parser.add_argument("type", type=str, help="the type of anaylsis to perform")
     type_parser.add_argument("-a", action='store_true', help="artist")
     type_parser.add_argument("-n", nargs="?", type=int, const=True, default=False, help="display number of streams")
+    type_parser.add_argument("-r", default=50, type=int, help="number of ranks to show when running top")
     type_parser.add_argument("-w", default=24, type=int, help="total number of weeks to calculate")
     
     addStatsArgs(type_parser)
@@ -152,9 +180,11 @@ def addStatsArgs(parser: argparse.ArgumentParser):
     lengthGroup.add_argument("-ld", type=int, help="total number of days to calculate")
     lengthGroup.add_argument("-lw", type=int, help="total number of weeks to calculate")
     lengthGroup.add_argument("-lm", default=1, type=int, help="total number of months to calculate")
+    parser.add_argument("--wrapped", type=int, help="wrapped year to show")
+    parser.add_argument("-p", action='store_true', help="hide prev stats")
     return parser
     
-def getStats(endTime: datetime, length: timedelta, songStats=True, artistStats=True) -> list:
+def getStats(endTime: datetime, length: timedelta, songStats=True, artistStats=True, includeFeatures=True) -> list:
     endTime = endTime.replace(tzinfo=None)
     songs = []
     artists = []
@@ -181,7 +211,7 @@ def getStats(endTime: datetime, length: timedelta, songStats=True, artistStats=T
             except ValueError:
                 songs.append({'name': trackName, 'timesPlayed': 1})
         
-        eqArtists = {
+        equivArtists = {
             # 'Linkin Park': 'Linkin Park+',
             # 'Mike Shinoda': 'Linkin Park+',
             # 'Fort Minor': 'Linkin Park+',
@@ -207,26 +237,24 @@ def getStats(endTime: datetime, length: timedelta, songStats=True, artistStats=T
 
         # Track Artists
         if artistStats:
-            if type(play['artists']) == list:
+            if includeFeatures:
                 for i, artist in enumerate(play['artists']):
-                    if artist in eqArtists.keys():
-                        # Ensure don't count artist more than once per song
-                        if eqArtists[artist] in [eqArtists[play['artists'][n]] for n in range(i) if play['artists'][n] in eqArtists]: 
+                    if artist in equivArtists.keys():
+                        # Ensure doesn't count artist more than once per song
+                        if equivArtists[artist] in [equivArtists[play['artists'][n]] for n in range(i) if play['artists'][n] in equivArtists]: 
                             continue
-                        artist = eqArtists[artist]
+                        artist = equivArtists[artist]
                     try:
                         index = [d['name'] for d in artists].index(artist)
                         artists[index]['timesPlayed'] += 1
                     except ValueError:
                         artists.append({'name': artist, 'timesPlayed': 1})
-            else: 
-                if play['artists'] in eqArtists.keys():
-                    play['artists'] = eqArtists[play['artists']]
+            else:
                 try:
-                    index = [d['name'] for d in artists].index(play['artists'])
+                    index = [d['name'] for d in artists].index(play['artists'][0])
                     artists[index]['timesPlayed'] += 1
                 except ValueError:
-                    artists.append({'name': play['artists'], 'timesPlayed': 1})
+                    artists.append({'name': play['artists'][0], 'timesPlayed': 1})
     if songStats == False:
         return artists
     elif artistStats == False:
@@ -236,7 +264,7 @@ def getStats(endTime: datetime, length: timedelta, songStats=True, artistStats=T
 def sortFunc(e):
     return e['timesPlayed']
 
-def top(list: list, prevList=list(), numPlaces=50): 
+def top(list: list, prevList=list(), showNum=False, numPlaces=50): 
     list.sort(reverse=True, key=sortFunc)
     prevList.sort(reverse=True, key=sortFunc)
     prevValue = float('inf')
@@ -254,26 +282,26 @@ def top(list: list, prevList=list(), numPlaces=50):
                 prevRank = -1
             
             prevComparison = ' '
-            if prevRank > 50 or prevRank == -1:
+            if prevRank > numPlaces or prevRank == -1:
                 prevComparison = '\033[94m·'
             elif prevRank > i:
                 prevComparison = '\033[92m↑'
             elif prevRank < i:
                 prevComparison = '\033[91m↓'
 
-        print(str(rank), prevComparison, list[i]['name'], list[i]['timesPlayed'], '\033[0m')
+        print(str(rank), prevComparison, list[i]['name'], list[i]['timesPlayed'] if showNum else "", '\033[0m')
         
-def topHistory(name: str, isSong: bool, dateRange=timedelta(weeks=24), freq=timedelta(weeks=1), basedOnRank=True):
+def topHistory(name: str, isSong: bool, numPlaces=50, dateRange=timedelta(weeks=24), freq=timedelta(weeks=1), basedOnRank=True):
     history = pd.DataFrame(
         {
             "date": pd.date_range(getStartOfWeek(datetime.now())-dateRange, datetime.now(), freq=freq),
-            "position": 50 if basedOnRank else 0
+            "position": numPlaces if basedOnRank else 0
         }
     )
     todayRow = pd.DataFrame([
         {
             "date": datetime.now(),
-            "position": 50 if basedOnRank else 0
+            "position": numPlaces if basedOnRank else 0
         }
     ])
     history = pd.concat([history, todayRow], ignore_index=True)
@@ -283,7 +311,7 @@ def topHistory(name: str, isSong: bool, dateRange=timedelta(weeks=24), freq=time
         if basedOnRank:
             currentStats.sort(reverse=True, key=sortFunc)
             prevValue = float('inf')
-            for pos in range(min(50, len(currentStats))):
+            for pos in range(min(numPlaces, len(currentStats))):
                 if prevValue > currentStats[pos]['timesPlayed']:
                     prevValue = currentStats[pos]['timesPlayed']
                 # print(str(rank), artistsNow[pos]['name'], artistsNow[pos]['timesPlayed'])
@@ -295,9 +323,9 @@ def topHistory(name: str, isSong: bool, dateRange=timedelta(weeks=24), freq=time
                     history.loc[i, 'position'] = currentStats[pos]['timesPlayed']
                     break
 
-    showPlot(history['date'], history['position'], name, rank=basedOnRank)    
+    showPlot(history['date'], history['position'], name, numPlaces, rank=basedOnRank)    
 
-def topNewSongs():
+def topNewSongs(numPlaces=50):
     playlistSongs = ["ONE OK ROCK: Wonder - Japanese Version",
                      "Fujii Kaze: Shinunoga E-Wa",
                      "DAY6: Zombie (English Ver.)",
@@ -337,15 +365,7 @@ def topNewSongs():
     
     newSongs = [s for s in songs if s['name'].lower() not in [s.lower() for s in playlistSongs]]
     # newSongs = [s for s in songs if s['name'] not in [s for s in playlistSongs]]
-    newSongs.sort(reverse=True, key=sortFunc)
-    prevValue = float('inf')
-    rank = 1
-    for i in range(min(50, len(newSongs))):
-        if prevValue > newSongs[i]['timesPlayed']:
-            rank = i+1
-            prevValue = newSongs[i]['timesPlayed']
-        
-        print(str(rank), newSongs[i]['name'], newSongs[i]['timesPlayed'])        
+    top(newSongs, numPlaces=numPlaces)
 
 def findSong(title: str): 
     songs.sort(reverse=True, key=sortFunc)
@@ -376,7 +396,7 @@ def analyzeSongStats():
             numOfSongs += artist['timesPlayed']
     print(numOfSongs/sum([s['timesPlayed'] for s in songs]))
 
-def showPlot(x, y, name, rank=True):
+def showPlot(x: int, y: int, name: str, numPlaces: int, rank=True):
     fig,ax = plt.subplots()
     line, = plt.plot(x,y)
     if rank:
