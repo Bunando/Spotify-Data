@@ -4,6 +4,9 @@ from datetime import timedelta
 import spotipy
 from spotipy import SpotifyClientCredentials
 from JSONEncoder import CompactListJSONEncoder
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Get last date from AllData
 lastDate = datetime.min
@@ -39,6 +42,9 @@ for i, play in enumerate(newData):
     
     print(str(round((i+1)/len(newData)*100, 2)) + "%")
     song = sp.search("track:" + play['trackName'] + " artist:" + play['artistName'], limit=1, type='track')
+
+    if play['artistName'] != song['tracks']['items'][0]['artists'][0]['name']:
+        print(play['artistName'], song['tracks']['items'][0]['artists'][0]['name'])
 
     data.append({'endTime': play['endTime'], 
                 'artists': [artist['name'] for artist in song['tracks']['items'][0]['artists']],

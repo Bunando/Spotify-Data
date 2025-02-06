@@ -69,7 +69,7 @@ def main():
             topHistory(input('Artist: '), False, type_args.r, timedelta(weeks=type_args.w), basedOnRank=not type_args.n)
 
         elif type_args.type == 'n':
-            topNewSongs()
+            topNewSongs(type_args.r)
 
         elif type_args.type == 'f':
             if type_args.a == True:
@@ -90,12 +90,17 @@ def init(args: argparse.Namespace) -> None:
     loadData()
 
     if args.wrapped != None:
-        endDate = "11-26"
+        endDate = "11-25" #11/22 - 11/25
         currStats = getStats(datetime.fromisoformat(str(args.wrapped)+"-"+endDate), datetime.fromisoformat(str(args.wrapped)+"-"+endDate)-datetime.fromisoformat(str(args.wrapped)+"-01-01"), includeFeatures=False)
         print(f"Minutes: {(ms/60000):.2f}")
+        print(f"Unique Aritsts: {len(currStats[1])}")
         prevStats = [list(), list()]
         if not args.p:
-            prevStats = getStats(datetime.fromisoformat(str(args.wrapped-1)+"-"+endDate), datetime.fromisoformat(str(args.wrapped-1)+"-"+endDate)-datetime.fromisoformat(str(args.wrapped-1)+"-01-01"), includeFeatures=False)
+            if datetime.fromisoformat(str(args.wrapped)+"-"+endDate) < datetime.now():
+                prevStats = getStats(datetime.fromisoformat(str(args.wrapped-1)+"-"+endDate), datetime.fromisoformat(str(args.wrapped-1)+"-"+endDate)-datetime.fromisoformat(str(args.wrapped-1)+"-01-01"), includeFeatures=False)
+            else:
+                endTime = datetime.now(tz=timezone.utc)
+                prevStats = getStats(getStartOfWeek(endTime), getStartOfWeek(endTime)-datetime.fromisoformat(str(args.wrapped)+"-01-01"), includeFeatures=False)
         stats = {
             "songs" : currStats[0],
             "artists" : currStats[1],
@@ -103,17 +108,26 @@ def init(args: argparse.Namespace) -> None:
             "prevArtists": prevStats[1],
         }
         setStats(stats)
-        args.n = True
+        try:
+            args.n = not args.n
+        except AttributeError:
+            pass
         return
-
+    
     if args.eo != None:
-        endTime = getStartOfWeek(datetime.now(tz=timezone.utc) - timedelta(weeks=args.eo))
+        endTime = datetime.now(tz=timezone.utc) - timedelta(weeks=args.eo)
+        if args.sd == None:
+            endTime = getStartOfWeek(endTime)
     elif args.ed != None:
-        endTime = getStartOfWeek(datetime.fromisoformat(args.ed))
+        endTime = datetime.fromisoformat(args.ed)
+        if args.sd == None:
+            endTime = getStartOfWeek(endTime)
     else:
         endTime = datetime.now(tz=timezone.utc)
-
-    if args.ld != None:
+    
+    if args.sd != None:
+        timeLength = endTime-datetime.fromisoformat(args.sd)
+    elif args.ld != None:
         timeLength = timedelta(days=args.ld)
     elif args.lw != None:
         timeLength = timedelta(weeks=args.lw)
@@ -177,9 +191,10 @@ def addStatsArgs(parser: argparse.ArgumentParser):
     endDateGroup.add_argument("-eo", type=int, help="end date offset")
     endDateGroup.add_argument("-ed", type=str, help="end date")
     lengthGroup = parser.add_mutually_exclusive_group()
-    lengthGroup.add_argument("-ld", type=int, help="total number of days to calculate")
-    lengthGroup.add_argument("-lw", type=int, help="total number of weeks to calculate")
-    lengthGroup.add_argument("-lm", default=1, type=int, help="total number of months to calculate")
+    lengthGroup.add_argument("-ld", type=int, help="time period in days to calculate")
+    lengthGroup.add_argument("-lw", type=int, help="time period in weeks to calculate")
+    lengthGroup.add_argument("-lm", default=1, type=int, help="time period in months to calculate")
+    lengthGroup.add_argument("-sd", type=str, help="start date")
     parser.add_argument("--wrapped", type=int, help="wrapped year to show")
     parser.add_argument("-p", action='store_true', help="hide prev stats")
     return parser
@@ -189,11 +204,10 @@ def getStats(endTime: datetime, length: timedelta, songStats=True, artistStats=T
     songs = []
     artists = []
     global ms
-    for play in data[::-1]:
-        if not (endTime-length <= datetime.fromisoformat(play['endTime']) <= endTime):
+    startTime = endTime-length
+    for play in data:
+        if not (startTime < datetime.fromisoformat(play['endTime']) < endTime):
             continue
-        # if not (datetime.fromisoformat("2024-01-01") <= datetime.fromisoformat(play['endTime']) <= datetime.fromisoformat("2024-11-30")):
-        #     continue
         
         ms += play['msPlayed']
 
@@ -353,7 +367,9 @@ def topNewSongs(numPlaces=50):
                      "Mike Shinoda: Place To Start - Remastered",
                      "Depeche Mode: If You Want",
                      "Queen: Bohemian Rhapsody - Remastered 2011",
-                     "Depeche Mode: Somebody"]
+                     "Depeche Mode: Somebody", 
+                     "U2: Bad - Remastered 2009",
+                     "Depeche Mode: Something to Do"]
 
     newResult = sp.playlist_items(playlist_id='spotify:playlist:7Lp7Bv2OtPB0N4DRRPzrG3')
     offset = 0
@@ -365,7 +381,7 @@ def topNewSongs(numPlaces=50):
     
     newSongs = [s for s in songs if s['name'].lower() not in [s.lower() for s in playlistSongs]]
     # newSongs = [s for s in songs if s['name'] not in [s for s in playlistSongs]]
-    top(newSongs, numPlaces=numPlaces)
+    top(newSongs, showNum=True, numPlaces=numPlaces)
 
 def findSong(title: str): 
     songs.sort(reverse=True, key=sortFunc)
